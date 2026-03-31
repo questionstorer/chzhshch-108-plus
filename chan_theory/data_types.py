@@ -1,6 +1,6 @@
 """
 Core data structures for Chan Theory technical analysis.
-Based on Lessons 15, 17, 20, 24, 62 of 缠中说禅.
+Based on Lessons 15, 17, 20, 24, 29, 33, 37, 62, 77, 81, 108 of 缠中说禅.
 """
 
 from __future__ import annotations
@@ -19,6 +19,13 @@ class FractalType(Enum):
     BOTTOM = auto()  # 底分型
 
 
+class FractalStrength(Enum):
+    """Fractal strength classification (Lesson 82)."""
+    STRONG = auto()    # 强分型 - likely reversal
+    WEAK = auto()      # 弱分型 - likely continuation
+    NORMAL = auto()    # 普通分型
+
+
 class SignalType(Enum):
     """Three classes of buy/sell points (Lessons 15, 17, 20)."""
     BUY_1ST = "B1"   # 第一类买点 - after divergence in downtrend
@@ -27,6 +34,46 @@ class SignalType(Enum):
     SELL_1ST = "S1"   # 第一类卖点 - after divergence in uptrend
     SELL_2ND = "S2"   # 第二类卖点 - rally high after 1st sell
     SELL_3RD = "S3"   # 第三类卖点 - retest not breaking ZD
+
+
+class TrendType(Enum):
+    """Trend types per Lesson 17."""
+    UPTREND = auto()        # 上涨趋势 - 2+ ascending hubs
+    DOWNTREND = auto()      # 下跌趋势 - 2+ descending hubs
+    CONSOLIDATION = auto()  # 盘整 - single hub
+    UNKNOWN = auto()
+
+
+class TrendStatus(Enum):
+    """Real-time trend completion status (Lesson 17: 走势必完美)."""
+    FORMING = auto()        # 走势正在形成中
+    HUB_FORMED = auto()     # 中枢已形成
+    EXTENDING = auto()      # 中枢延伸中
+    DIVERGING = auto()      # 背驰段出现
+    COMPLETING = auto()     # 走势即将完成
+    COMPLETED = auto()      # 走势已完成
+
+
+class PostDivergenceOutcome(Enum):
+    """Post-divergence classification (Lesson 29)."""
+    LEVEL_EXPANSION = auto()   # 中枢级别扩展 (weakest rebound)
+    CONSOLIDATION = auto()     # 更大级别盘整
+    REVERSE_TREND = auto()     # 反向趋势 (strongest reversal)
+
+
+class MAKissType(Enum):
+    """MA kiss types (Lesson 15)."""
+    FLY_KISS = auto()   # 飞吻 - barely touch
+    LIP_KISS = auto()   # 唇吻 - brief touch
+    WET_KISS = auto()   # 湿吻 - prolonged intertwine
+
+
+class GapType(Enum):
+    """Gap types (Lesson 77)."""
+    BREAKTHROUGH = auto()   # 突破缺口
+    CONTINUATION = auto()   # 中继缺口
+    EXHAUSTION = auto()     # 竭尽缺口
+    ORDINARY = auto()       # 普通缺口 (hub oscillation)
 
 
 @dataclass
@@ -186,6 +233,9 @@ class Hub:
     ZD: float       # bottom of overlap zone = max of first two lows
     GG: float       # highest high of all elements
     DD: float       # lowest low of all elements
+    level: int = 0         # hub level (0=bi-level, 1=segment-level, etc.)
+    is_extended: bool = False   # whether hub has been extended (Lesson 25)
+    extension_count: int = 0    # number of extensions
 
     @property
     def range(self) -> tuple[float, float]:
@@ -196,8 +246,17 @@ class Hub:
     def width(self) -> float:
         return self.ZG - self.ZD
 
+    @property
+    def center(self) -> float:
+        """Hub center point - useful for tracking hub migration."""
+        return (self.ZG + self.ZD) / 2.0
+
     def contains(self, price: float) -> bool:
         return self.ZD <= price <= self.ZG
+
+    def overlaps(self, other: Hub) -> bool:
+        """Check if this hub overlaps with another (for hub expansion)."""
+        return self.ZD <= other.ZG and other.ZD <= self.ZG
 
 
 @dataclass
@@ -211,4 +270,34 @@ class Signal:
     price: float
     bi: Optional[Bi] = None
     hub: Optional[Hub] = None
+    level: int = 0             # which analysis level generated this signal
     description: str = ""
+
+
+@dataclass
+class TrendMonitor:
+    """
+    Real-time trend growth/completion monitor (Lessons 17, 45, 108).
+
+    Tracks: has minimum structure formed? Is hub extending?
+    Has divergence segment appeared? Is trend completing?
+    """
+
+    trend_type: TrendType = TrendType.UNKNOWN
+    status: TrendStatus = TrendStatus.FORMING
+    hubs_formed: int = 0
+    current_segment_count: int = 0
+    has_divergence: bool = False
+    post_divergence: Optional[PostDivergenceOutcome] = None
+    phase: str = "unknown"   # "bottom", "middle", "top" per Lesson 108
+
+
+@dataclass
+class Gap:
+    """Price gap (缺口) per Lesson 77."""
+    gap_type: GapType
+    dt: str
+    high: float         # top of gap
+    low: float          # bottom of gap
+    direction: Direction
+    is_filled: bool = False
