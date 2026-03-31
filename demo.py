@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 Demo: 缠论技术分析系统 (Chan Theory Technical Analysis)
 
