@@ -120,27 +120,37 @@ def classify_post_divergence(
     Classify the outcome after divergence (Lesson 29).
 
     After divergence in a+A+b+B+c pattern, exactly 3 possible outcomes:
-      1. Level expansion (weakest): rebound only reaches DD of last hub
-      2. Higher-level consolidation: re-enters last hub
+      1. Level expansion (weakest): rebound reaches DD/GG of last hub but does
+         NOT re-enter the core hub zone [ZD, ZG]. Per Lesson 29, the minimum
+         valid rebound is one that at least reaches DD/GG; if it can't even
+         reach DD/GG a new hub is forming below/above.
+      2. Higher-level consolidation: re-enters last hub core [ZD, ZG]
       3. Reverse trend (strongest): breaks through last hub to the other side
 
-    Determined by whether the first sub-level rebound re-enters the last hub.
+    The key threshold between outcomes 1 and 2 is whether the first sub-level
+    rebound re-enters the core hub zone [ZD, ZG], not the outer DD/GG bounds.
     """
     if current_bi.direction == Direction.UP:
-        # After a bottom divergence, checking the rebound
-        if current_bi.high < last_hub.DD:
+        # After a bottom divergence, checking the upward rebound
+        if current_bi.high < last_hub.ZD:
+            # Rebound didn't reach hub core zone → level expansion (weakest)
             return PostDivergenceOutcome.LEVEL_EXPANSION
         elif current_bi.high <= last_hub.ZG:
+            # Re-entered hub core zone [ZD, ZG] → higher-level consolidation
             return PostDivergenceOutcome.CONSOLIDATION
         else:
+            # Broke through hub zone above ZG → reverse trend (uptrend)
             return PostDivergenceOutcome.REVERSE_TREND
     else:
-        # After a top divergence, checking the decline
-        if current_bi.low > last_hub.GG:
+        # After a top divergence, checking the downward decline
+        if current_bi.low > last_hub.ZG:
+            # Decline didn't reach hub core zone → level expansion (weakest)
             return PostDivergenceOutcome.LEVEL_EXPANSION
         elif current_bi.low >= last_hub.ZD:
+            # Re-entered hub core zone [ZD, ZG] → higher-level consolidation
             return PostDivergenceOutcome.CONSOLIDATION
         else:
+            # Broke through hub zone below ZD → reverse trend (downtrend)
             return PostDivergenceOutcome.REVERSE_TREND
 
 

@@ -19,7 +19,7 @@ Implementation of the "缠中说禅" (Chan Zhong Shuo Chan) technical analysis s
 
 ## Overview
 
-This system implements the complete Chan Theory (缠论) framework:
+This system implements a comprehensive Chan Theory (缠论) framework based on the 108 lessons of 缠中说禅. Core theorems (Lessons 17, 20, 29, 62) are followed faithfully; higher-level constructs such as segment construction and the three-phase model are practical approximations that cover the common cases.
 
 | Feature | Lessons | Module |
 |---------|---------|--------|

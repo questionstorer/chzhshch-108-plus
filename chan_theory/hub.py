@@ -181,10 +181,14 @@ def detect_hubs_from_segments(segments: list[Segment]) -> list[Hub]:
 
 def _check_hub_expansion(hubs: list[Hub]) -> list[Hub]:
     """
-    Check for hub expansion (Lesson 36: 中枢扩展).
+    Check for hub expansion into a higher-level hub (Lesson 20 Theorem 2).
 
-    Two adjacent same-level hubs with overlapping [ZD, ZG] ranges
-    merge into a higher-level hub.
+    Per 缠中说禅走势中枢中心定理二, two adjacent same-level hubs form a
+    higher-level hub when their core zones [ZD, ZG] are NOT trend-separated
+    but their outer oscillation ranges [DD, GG] DO overlap:
+      - 后ZG < 前ZD 且 后GG >= 前DD  (curr core below prev core, outers overlap)
+      - 后ZD > 前ZG 且 后DD <= 前GG  (curr core above prev core, outers overlap)
+    Core-zone overlap by itself means the hub is extending, NOT expanding.
     """
     if len(hubs) < 2:
         return hubs
@@ -195,14 +199,35 @@ def _check_hub_expansion(hubs: list[Hub]) -> list[Hub]:
         prev = result[-1]
         curr = hubs[i]
 
-        if prev.overlaps(curr):
-            # Merge into higher-level hub
+        # Theorem 2 conditions for higher-level hub formation
+        cores_above = curr.ZD > prev.ZG   # curr core entirely above prev core
+        cores_below = curr.ZG < prev.ZD   # curr core entirely below prev core
+
+        if cores_above:
+            # Trend would require curr.DD > prev.GG; otherwise higher-level hub
+            should_expand = curr.DD <= prev.GG
+        elif cores_below:
+            # Trend would require curr.GG < prev.DD; otherwise higher-level hub
+            should_expand = curr.GG >= prev.DD
+        else:
+            # Cores overlap — this is a hub extension, not expansion
+            should_expand = False
+
+        if should_expand:
+            # Merge into higher-level hub.
+            # New core zone = overlap of the two outer envelopes.
             merged_elements = prev.elements + curr.elements
+            new_ZG = min(prev.GG, curr.GG)
+            new_ZD = max(prev.DD, curr.DD)
+            if new_ZG <= new_ZD:
+                # Safety fallback: use union of core zones
+                new_ZG = max(prev.ZG, curr.ZG)
+                new_ZD = min(prev.ZD, curr.ZD)
             merged = Hub(
                 index=prev.index,
                 elements=merged_elements,
-                ZG=max(prev.ZG, curr.ZG),
-                ZD=min(prev.ZD, curr.ZD),
+                ZG=new_ZG,
+                ZD=new_ZD,
                 GG=max(prev.GG, curr.GG),
                 DD=min(prev.DD, curr.DD),
                 level=max(prev.level, curr.level) + 1,
@@ -270,12 +295,14 @@ def classify_trend(hubs: list[Hub]) -> TrendType:
     if len(hubs) == 1:
         return TrendType.CONSOLIDATION
 
-    # Check if hubs are in same direction (non-overlapping, progressing)
+    # Check if hubs are in same direction, using Lesson 20 Theorem 2:
+    # Uptrend continuation: 后DD > 前GG
+    # Downtrend continuation: 后GG < 前DD
     ascending = all(
-        hubs[i + 1].ZD > hubs[i].ZG for i in range(len(hubs) - 1)
+        hubs[i + 1].DD > hubs[i].GG for i in range(len(hubs) - 1)
     )
     descending = all(
-        hubs[i + 1].ZG < hubs[i].ZD for i in range(len(hubs) - 1)
+        hubs[i + 1].GG < hubs[i].DD for i in range(len(hubs) - 1)
     )
 
     if ascending:

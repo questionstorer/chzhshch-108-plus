@@ -32,7 +32,7 @@ def detect_signals(
     """
     signals: list[Signal] = []
 
-    signals.extend(_detect_1st_class(bis, closes))
+    signals.extend(_detect_1st_class(bis, hubs, closes))
     signals.extend(_detect_2nd_class(bis, signals))
     signals.extend(_detect_3rd_class(bis, hubs))
 
@@ -41,7 +41,11 @@ def detect_signals(
     return signals
 
 
-def _detect_1st_class(bis: list[Bi], closes: list[float]) -> list[Signal]:
+def _detect_1st_class(
+    bis: list[Bi],
+    hubs: list[Hub],
+    closes: list[float],
+) -> list[Signal]:
     """
     Detect 1st class buy/sell points (第一类买卖点).
 
@@ -52,8 +56,14 @@ def _detect_1st_class(bis: list[Bi], closes: list[float]) -> list[Signal]:
     1st Sell: Divergence at end of uptrend
       - Two consecutive up Bi where the 2nd has weaker MACD area
       - Price makes new high but MACD doesn't confirm
+
+    Prerequisite (Lesson 15: 没有趋势，没有背驰):
+      A valid 1st-class point requires a confirmed trend, which means at least
+      two non-overlapping same-level hubs (per Lesson 17 trend definition).
+      Without this, divergence is only 盘整背驰 (consolidation divergence), not
+      true trend divergence, and should not be labeled B1/S1.
     """
-    if len(bis) < 3 or len(closes) < 26:
+    if len(bis) < 3 or len(closes) < 26 or len(hubs) < 2:
         return []
 
     _, _, histogram = compute_macd(closes)

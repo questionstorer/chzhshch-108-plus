@@ -462,7 +462,7 @@ def chart_divergence():
     ax1.annotate("Low C = 11.5  (NEW LOW!)", xy=(23, 11.5), fontsize=10, color="orange",
                  arrowprops=dict(arrowstyle="->"), xytext=(20, 9.5))
 
-    ax1.set_title("Top Divergence (顶背驰) — Lesson 15", fontsize=13, fontweight="bold")
+    ax1.set_title("Bottom Divergence (底背驰) — Lesson 15", fontsize=13, fontweight="bold")
     ax1.set_ylabel("Price")
     ax1.legend()
 

@@ -226,17 +226,48 @@ def _find_matching_signals(
     time_window: int = 5,
 ) -> list[Signal]:
     """
-    Find signals in candidates that match the target signal type direction.
+    Find signals in candidates that match the target signal direction and
+    fall within ``time_window`` days of the target signal's date.
 
-    A match means: same buy/sell direction within a reasonable time window.
+    True 区间套 requires that sub-level signals occur during the higher-level
+    divergence interval (i.e., are time-aligned with the target).  Without
+    this filter the returned signals can come from completely unrelated dates,
+    making the confidence score meaningless.
+
+    Date strings are expected to be in ISO-8601 format (YYYY-MM-DD or
+    YYYY-MM-DD HH:MM:SS).  If parsing fails, the time filter is skipped and
+    all same-direction candidates are returned as a best-effort fallback.
     """
+    from datetime import datetime
+
     is_buy = target.type.value.startswith("B")
+
+    # Try to parse the target date
+    target_dt = None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%Y%m%d"):
+        try:
+            target_dt = datetime.strptime(target.dt, fmt)
+            break
+        except ValueError:
+            continue
 
     matching = []
     for s in candidates:
-        same_direction = s.type.value.startswith("B") == is_buy
-        if same_direction:
-            matching.append(s)
+        if s.type.value.startswith("B") != is_buy:
+            continue
 
-    # Return the last few matching signals (most recent)
+        if target_dt is not None:
+            s_dt = None
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%Y%m%d"):
+                try:
+                    s_dt = datetime.strptime(s.dt, fmt)
+                    break
+                except ValueError:
+                    continue
+
+            if s_dt is not None and abs((s_dt - target_dt).days) > time_window:
+                continue
+
+        matching.append(s)
+
     return matching[-3:] if matching else []

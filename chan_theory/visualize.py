@@ -78,7 +78,8 @@ def plot_analysis(
         else:
             o = c = k.mid
 
-        color = "#d32f2f" if c < o else "#388e3c"
+        # A-share convention: red = bullish (up), green = bearish (down)
+        color = "#d32f2f" if c >= o else "#388e3c"
         ax1.plot([i, i], [k.low, k.high], color=color, linewidth=0.8)
         ax1.plot([i, i], [min(o, c), max(o, c)], color=color, linewidth=3.0)
 
@@ -308,7 +309,8 @@ def plot_multi_level(
                 c = k.elements[-1].close
             else:
                 o = c = k.mid
-            color = "#d32f2f" if c < o else "#388e3c"
+            # A-share convention: red = bullish (up), green = bearish (down)
+            color = "#d32f2f" if c >= o else "#388e3c"
             ax.plot([i, i], [k.low, k.high], color=color, linewidth=0.5)
             ax.plot([i, i], [min(o, c), max(o, c)], color=color, linewidth=2.0)
 

@@ -44,9 +44,9 @@ It is perhaps the most comprehensive and mathematically rigorous technical analy
 | Feature | Traditional TA | Chan Theory |
 |---------|---------------|-------------|
 | Foundation | Indicators (lagging) | Geometric structure (real-time) |
-| Buy/sell signals | Pattern recognition | Mathematical classification of exactly 3 types |
+| Buy/sell signals | Pattern recognition | Three signal classes (B1/B2/B3, S1/S2/S3) with lesson-defined prerequisites |
 | Trend definition | Moving average direction | Hub structure (precise) |
-| Multi-timeframe | Ad hoc comparison | Formal "interval nesting" algorithm |
+| Multi-timeframe | Ad hoc comparison | Multi-level joint analysis with time-aligned interval nesting |
 | Completeness | No guarantee | **"走势必完美"** — all trends MUST complete |
 
 The single most important principle in Chan Theory is: **走势必完美** — "All price movements must complete themselves." Every downtrend will end, every uptrend will end, and the transition points are identifiable.
@@ -913,11 +913,11 @@ python demo.py
 
 ### Run with your own stock
 
-Edit `demo_ashare.py` and change the `ts_code` variable:
-```python
-ts_code = "600519.SH"  # Kweichow Moutai
-# or
-ts_code = "000001.SZ"  # Ping An Bank
+Pass your stock code using the `--code` argument:
+```bash
+python demo_ashare.py --code sh600519   # Kweichow Moutai (贵州茅台)
+python demo_ashare.py --code sz000001   # Ping An Bank (平安银行)
+python demo_ashare.py --code 000001.SZ --count 400  # with bar count
 ```
 
 ### What to look at in the output
