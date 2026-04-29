@@ -19,7 +19,7 @@ Implementation of the "缠中说禅" (Chan Zhong Shuo Chan) technical analysis s
 
 ## Overview
 
-This system implements a comprehensive Chan Theory (缠论) framework based on the 108 lessons of 缠中说禅. Core theorems (Lessons 17, 20, 29, 62) are followed faithfully; higher-level constructs such as segment construction and the three-phase model are practical approximations that cover the common cases.
+This system implements a comprehensive Chan Theory (缠论) framework based on the 108 lessons of 缠中说禅. Core theorems (Lessons 17, 20, 29, 62) are followed closely; higher-level constructs such as segment construction, interval nesting, and the three-phase model are practical approximations that cover the common cases.
 
 | Feature | Lessons | Module |
 |---------|---------|--------|
@@ -298,9 +298,9 @@ status = mla.cross_level_trend_status()
 
 | Type | Chinese | Description |
 |------|---------|-------------|
-| `UPTREND` | 上涨趋势 | 2+ ascending non-overlapping hubs |
-| `DOWNTREND` | 下跌趋势 | 2+ descending non-overlapping hubs |
-| `CONSOLIDATION` | 盘整 | Single hub or overlapping hubs |
+| `UPTREND` | 上涨趋势 | 2+ ascending hubs where Hub2.DD > Hub1.GG (Lesson 20) |
+| `DOWNTREND` | 下跌趋势 | 2+ descending hubs where Hub2.GG < Hub1.DD (Lesson 20) |
+| `CONSOLIDATION` | 盘整 | Single hub or hubs that don't meet the DD/GG trend condition |
 
 ---
 
@@ -441,8 +441,8 @@ print(f"Description: {phase['description']}")
 ### Post-Divergence Classification (Lesson 29)
 
 After divergence in pattern `a + A + b + B + c`:
-1. **Level expansion** (weakest): Rebound barely reaches DD of last hub
-2. **Consolidation**: Rebound re-enters last hub zone
+1. **Level expansion** (weakest): Rebound stays below ZD of last hub
+2. **Consolidation**: Rebound re-enters last hub zone [ZD, ZG]
 3. **Reverse trend** (strongest): Breaks through last hub entirely
 
 ### The Golden Rule

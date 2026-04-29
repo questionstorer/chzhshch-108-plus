@@ -337,6 +337,11 @@ def three_phase_analysis(
 
     At bottom/top: trade like hub oscillation
     Middle: hold position and ride the trend
+
+    Implementation note:
+      This is a practical heuristic that infers the phase from hub count
+      and last-Bi direction.  A fully lesson-faithful implementation would
+      require verifying the complete divergence segment structure.
     """
     if not hubs:
         return {"phase": "insufficient_data", "action": "wait"}

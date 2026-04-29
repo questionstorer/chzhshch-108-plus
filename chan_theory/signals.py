@@ -18,8 +18,9 @@ Completeness Theorem (Lesson 21):
 
 from __future__ import annotations
 
-from .data_types import Bi, Direction, Hub, Signal, SignalType
+from .data_types import Bi, Direction, Hub, Signal, SignalType, TrendType
 from .divergence import compute_macd, compute_macd_area
+from .hub import classify_trend
 
 
 def detect_signals(
@@ -59,11 +60,16 @@ def _detect_1st_class(
 
     Prerequisite (Lesson 15: 没有趋势，没有背驰):
       A valid 1st-class point requires a confirmed trend, which means at least
-      two non-overlapping same-level hubs (per Lesson 17 trend definition).
+      two non-overlapping same-level hubs forming an uptrend or downtrend
+      (per Lesson 17 trend definition, verified via classify_trend()).
       Without this, divergence is only 盘整背驰 (consolidation divergence), not
       true trend divergence, and should not be labeled B1/S1.
     """
     if len(bis) < 3 or len(closes) < 26 or len(hubs) < 2:
+        return []
+
+    trend = classify_trend(hubs)
+    if trend not in (TrendType.UPTREND, TrendType.DOWNTREND):
         return []
 
     _, _, histogram = compute_macd(closes)
@@ -105,7 +111,8 @@ def _detect_1st_class(
             continue
 
         # 1st class BUY point: end of downtrend with divergence
-        if curr.direction == Direction.DOWN:
+        # B1 requires a confirmed DOWNTREND (Lesson 15)
+        if curr.direction == Direction.DOWN and trend == TrendType.DOWNTREND:
             if curr.low <= prev_same.low and curr_area < prev_area:
                 signals.append(Signal(
                     type=SignalType.BUY_1ST,
@@ -119,7 +126,8 @@ def _detect_1st_class(
                 ))
 
         # 1st class SELL point: end of uptrend with divergence
-        elif curr.direction == Direction.UP:
+        # S1 requires a confirmed UPTREND (Lesson 15)
+        elif curr.direction == Direction.UP and trend == TrendType.UPTREND:
             if curr.high >= prev_same.high and curr_area < prev_area:
                 signals.append(Signal(
                     type=SignalType.SELL_1ST,

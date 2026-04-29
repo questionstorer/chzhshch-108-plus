@@ -131,52 +131,99 @@ class MultiLevelAnalyzer:
 
         return results
 
-    def level_resonance(self) -> list[dict]:
+    def level_resonance(self, time_window: int = 5) -> list[dict]:
         """
         Detect 级别共振 (level resonance) per Lesson 53.
 
         When multiple levels simultaneously show first-type buy/sell points,
         the resulting move is much more powerful.
 
+        Only first-class signals (B1/S1) are considered for resonance, and
+        signals must fall within ``time_window`` days of each other.
+
         Returns list of resonance events.
         """
+        from datetime import datetime
+
         events = []
 
-        # Collect latest signals from each level
+        # Collect all first-class signals from each level
         level_signals: dict[str, list[Signal]] = {}
         for name, analyzer in self._analyzers.items():
-            if analyzer.signals:
-                level_signals[name] = analyzer.signals
+            if not analyzer.signals:
+                continue
+            first_class = [
+                s for s in analyzer.signals
+                if s.type in (SignalType.BUY_1ST, SignalType.SELL_1ST)
+            ]
+            if first_class:
+                level_signals[name] = first_class
 
         if len(level_signals) < 2:
             return events
 
-        # Check for alignment of same-type signals across levels
-        # Focus on 1st class signals (strongest)
-        buy_levels = []
-        sell_levels = []
+        def _parse_dt(dt_str: str):
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%Y%m%d"):
+                try:
+                    return datetime.strptime(dt_str, fmt)
+                except ValueError:
+                    continue
+            return None
 
-        for name, signals in level_signals.items():
-            latest = signals[-1]
-            if latest.type in (SignalType.BUY_1ST, SignalType.BUY_2ND):
-                buy_levels.append(name)
-            elif latest.type in (SignalType.SELL_1ST, SignalType.SELL_2ND):
-                sell_levels.append(name)
+        # Check for alignment of same-type first-class signals across levels.
+        # For each pair of levels, check if any B1 (or S1) from one level
+        # is time-aligned with a B1 (or S1) from the other level.
+        level_names = list(level_signals.keys())
 
-        if len(buy_levels) >= 2:
+        def _signals_aligned(sigs_a, sigs_b, sig_type):
+            """Check if any signal of sig_type in sigs_a aligns with one in sigs_b."""
+            for sa in sigs_a:
+                if sa.type != sig_type:
+                    continue
+                sa_dt = _parse_dt(sa.dt)
+                for sb in sigs_b:
+                    if sb.type != sig_type:
+                        continue
+                    sb_dt = _parse_dt(sb.dt)
+                    if sa_dt is not None and sb_dt is not None:
+                        if abs((sa_dt - sb_dt).days) <= time_window:
+                            return True
+                    elif sa_dt is None or sb_dt is None:
+                        return True
+            return False
+
+        buy_aligned_levels: list[str] = []
+        sell_aligned_levels: list[str] = []
+
+        for i in range(len(level_names)):
+            for j in range(i + 1, len(level_names)):
+                na, nb = level_names[i], level_names[j]
+                sigs_a, sigs_b = level_signals[na], level_signals[nb]
+                if _signals_aligned(sigs_a, sigs_b, SignalType.BUY_1ST):
+                    if na not in buy_aligned_levels:
+                        buy_aligned_levels.append(na)
+                    if nb not in buy_aligned_levels:
+                        buy_aligned_levels.append(nb)
+                if _signals_aligned(sigs_a, sigs_b, SignalType.SELL_1ST):
+                    if na not in sell_aligned_levels:
+                        sell_aligned_levels.append(na)
+                    if nb not in sell_aligned_levels:
+                        sell_aligned_levels.append(nb)
+
+        if len(buy_aligned_levels) >= 2:
             events.append({
                 "type": "buy_resonance",
-                "levels": buy_levels,
-                "strength": len(buy_levels),
-                "description": f"买点共振: {', '.join(buy_levels)} 同时出现买点信号",
+                "levels": buy_aligned_levels,
+                "strength": len(buy_aligned_levels),
+                "description": f"买点共振: {', '.join(buy_aligned_levels)} 同时出现第一类买点信号",
             })
 
-        if len(sell_levels) >= 2:
+        if len(sell_aligned_levels) >= 2:
             events.append({
                 "type": "sell_resonance",
-                "levels": sell_levels,
-                "strength": len(sell_levels),
-                "description": f"卖点共振: {', '.join(sell_levels)} 同时出现卖点信号",
+                "levels": sell_aligned_levels,
+                "strength": len(sell_aligned_levels),
+                "description": f"卖点共振: {', '.join(sell_aligned_levels)} 同时出现第一类卖点信号",
             })
 
         return events

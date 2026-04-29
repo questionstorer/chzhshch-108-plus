@@ -33,9 +33,9 @@
 
 ## 1. What is Chan Theory?
 
-**Chan Theory (缠论)** is a complete technical analysis framework created by a Chinese blogger known as **缠中说禅** ("Chan Zhong Shuo Chan", roughly "Zen in Entanglement") through a series of **108 blog posts** published from 2006 to 2008, titled **"教你炒股票"** ("Teaching You Stock Trading").
+**Chan Theory (缠论)** is a comprehensive technical analysis framework created by a Chinese blogger known as **缠中说禅** ("Chan Zhong Shuo Chan", roughly "Zen in Entanglement") through a series of **108 blog posts** published from 2006 to 2008, titled **"教你炒股票"** ("Teaching You Stock Trading").
 
-It is perhaps the most comprehensive and mathematically rigorous technical analysis system ever developed for the Chinese stock market. Unlike most Western technical analysis (which relies on indicators and patterns), Chan Theory builds a **complete geometric decomposition** of price action from first principles:
+It is one of the most systematic technical analysis frameworks developed for the Chinese stock market. Unlike most Western technical analysis (which relies on indicators and patterns), Chan Theory builds a **geometric decomposition** of price action from first principles:
 
 **Raw candles → Processed candles → Fractals → Strokes → Segments → Hubs → Trends → Buy/Sell Signals**
 
@@ -46,7 +46,7 @@ It is perhaps the most comprehensive and mathematically rigorous technical analy
 | Foundation | Indicators (lagging) | Geometric structure (real-time) |
 | Buy/sell signals | Pattern recognition | Three signal classes (B1/B2/B3, S1/S2/S3) with lesson-defined prerequisites |
 | Trend definition | Moving average direction | Hub structure (precise) |
-| Multi-timeframe | Ad hoc comparison | Multi-level joint analysis with time-aligned interval nesting |
+| Multi-timeframe | Ad hoc comparison | Multi-level joint analysis with heuristic interval nesting |
 | Completeness | No guarantee | **"走势必完美"** — all trends MUST complete |
 
 The single most important principle in Chan Theory is: **走势必完美** — "All price movements must complete themselves." Every downtrend will end, every uptrend will end, and the transition points are identifiable.
@@ -331,6 +331,8 @@ This is one of the most mathematically precise aspects of Chan Theory. To determ
 
 When the characteristic sequence itself forms a fractal pattern (a top for up segments, a bottom for down segments), the segment is terminated.
 
+> **Implementation note:** The current `segment.py` uses a simplified Bi-to-Bi comparison as a practical approximation of the characteristic-sequence method described in Lessons 65 and 67. It does not build a fully standardized feature sequence with inclusion handling on feature-sequence elements. Results cover the common cases but may differ from the full lesson algorithm in edge cases.
+
 ### Two termination cases
 
 **Case 1 (Lesson 65)**: The characteristic sequence directly forms a fractal:
@@ -429,8 +431,8 @@ Once we have hubs, we can classify the market state with mathematical precision.
 |-----------|---------------|---------|
 | **0 hubs** | Unknown / too little data | 未知 |
 | **1 hub** | **Consolidation (盘整)** | 盘整 — price oscillates within hub |
-| **2+ ascending, non-overlapping hubs** | **Uptrend (上涨趋势)** | Hub2.ZD > Hub1.ZG |
-| **2+ descending, non-overlapping hubs** | **Downtrend (下跌趋势)** | Hub2.ZG < Hub1.ZD |
+| **2+ ascending, non-overlapping hubs** | **Uptrend (上涨趋势)** | Hub2.DD > Hub1.GG (Lesson 20 Theorem 2) |
+| **2+ descending, non-overlapping hubs** | **Downtrend (下跌趋势)** | Hub2.GG < Hub1.DD (Lesson 20 Theorem 2) |
 
 ### The critical principle: "走势必完美" (All trends must complete)
 
@@ -573,7 +575,8 @@ This means every decline starts from a sell point and ends at a buy point, and e
 ```python
 # From chan_theory/signals.py
 
-def _detect_1st_class(bis, closes):
+def _detect_1st_class(bis, hubs, closes):
+    # Requires classify_trend(hubs) to confirm UPTREND or DOWNTREND
     # Compare MACD areas of consecutive same-direction Bi
     # If divergence found → B1 or S1
 
@@ -611,18 +614,18 @@ if next_bi.high >= ZD and next_bi.low <= ZG:
     extension_count += 1
 ```
 
-### Hub Expansion (中枢扩展) — Lesson 36
+### Hub Expansion (中枢扩展) — Lesson 20/36
 
-When **two adjacent same-level hubs overlap**, they **merge** into a **higher-level hub**.
+When **two adjacent same-level hubs** have separated core zones but overlapping outer ranges (i.e. they do not meet the DD/GG trend-continuation condition), they **merge** into a **higher-level hub** (Lesson 20 Theorem 2).
 
 This is how market structure scales up:
-- Two bi-level hubs that overlap → one segment-level hub
-- Two segment-level hubs that overlap → one even higher-level hub
+- Two bi-level hubs that don’t form a trend → one segment-level hub
+- Two segment-level hubs that don’t form a trend → one even higher-level hub
 
 ```python
 # From chan_theory/hub.py
 def _check_hub_expansion(hubs):
-    # If prev_hub.overlaps(curr_hub) → merge into higher-level hub
+    # Theorem 2: cores separated but outers overlap → higher-level hub
     # The new hub has: level = max(prev.level, curr.level) + 1
 ```
 
@@ -647,7 +650,7 @@ Given the standard pattern **a + A + b + B + c** (where A and B are hubs, and a,
 
 ### Outcome 1: Level Expansion (级别扩展) — Weakest
 
-The rebound after divergence is **so weak** it doesn't even reach the bottom (DD) of the last hub.
+The rebound after divergence is **so weak** it doesn't even reach the core-zone floor (ZD) of the last hub.
 
 **What it means**: The reversal failed. The downtrend is continuing with expanded structure.
 **Action**: Don't buy, or exit immediately if you bought at B1.
@@ -669,7 +672,7 @@ The rebound after divergence **breaks completely through the last hub** to the o
 ```python
 # From chan_theory/strategies.py
 def classify_post_divergence(current_bi, last_hub):
-    if current_bi.high < last_hub.DD:
+    if current_bi.high < last_hub.ZD:
         return PostDivergenceOutcome.LEVEL_EXPANSION    # Weakest
     elif current_bi.high <= last_hub.ZG:
         return PostDivergenceOutcome.CONSOLIDATION       # Medium
@@ -738,7 +741,7 @@ This is Chan Theory's answer to multi-timeframe analysis — and it's far more r
 
 ### Interval Nesting (区间套) — Lesson 37
 
-The core idea: when you detect a divergence at a **higher timeframe**, you can pinpoint the **exact turning point** by zooming into lower timeframes:
+The core idea: when you detect a divergence at a **higher timeframe**, you can **narrow down the turning point** by zooming into lower timeframes:
 
 1. **Weekly chart**: Identify divergence zone (rough area)
 2. **Daily chart**: Find sub-level divergence within that zone (narrows the area)
@@ -747,17 +750,19 @@ The core idea: when you detect a divergence at a **higher timeframe**, you can p
 
 This creates a **nested set of converging intervals** — hence "interval nesting."
 
+> **Implementation note:** The current `interval_nesting()` matches sub-level signals by date proximity within a configurable `time_window`, rather than verifying true interval containment within the higher-level divergence segment. This is a heuristic approximation of the lesson’s 区间套 concept.
+
 ### Level Resonance (级别共振) — Lesson 53
 
-When **multiple timeframes simultaneously** show buy/sell signals, the resulting move is **much more powerful**.
+When **multiple timeframes simultaneously** show first-class buy/sell signals (B1/S1), the resulting move is **much more powerful**.
 
-Example: If the daily chart shows B1 AND the weekly chart shows B2, the subsequent rally will be much stronger than if only the daily chart had a signal.
+Example: If the daily chart shows B1 AND the weekly chart also shows B1 within a few days, the subsequent rally will be much stronger than if only the daily chart had a signal.
 
 ```python
 # From chan_theory/multi_level.py
-def level_resonance(self):
-    # Check if latest signals across levels are aligned
-    # If daily + weekly both show buy signals → "buy resonance" → very bullish
+def level_resonance(self, time_window=5):
+    # Check if latest B1/S1 signals across levels are time-aligned
+    # If daily + weekly both show B1 within time_window → "buy resonance"
 ```
 
 ### In practice (our demo)
@@ -808,7 +813,9 @@ def mechanical_trading_signals(bis, hubs, closes):
 
 ### Strategy 3: Three-Phase Model (三段走势分类) — Lesson 108
 
-The final lesson synthesizes everything into a three-phase model:
+The final lesson synthesizes everything into a three-phase model.
+
+> **Implementation note:** The current `three_phase_analysis()` infers the phase from hub count and the direction of the last Bi. This is a practical heuristic inspired by Lesson 108, not a full lesson-faithful construction.
 
 | Phase | Name | Meaning | Action |
 |-------|------|---------|--------|
