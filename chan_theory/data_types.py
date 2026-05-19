@@ -111,12 +111,15 @@ class KLine:
 @dataclass
 class Fractal:
     """
-    Fractal pattern (分型) per Lesson 62.
+    Fractal pattern (分型) per Lessons 62, 77.
 
     Top Fractal (顶分型): k2.high = max(k1.high, k2.high, k3.high)
                           AND k2.low = max(k1.low, k2.low, k3.low)
     Bottom Fractal (底分型): k2.low = min(k1.low, k2.low, k3.low)
                              AND k2.high = min(k1.high, k2.high, k3.high)
+
+    Adjacent valid fractals must satisfy combination law: they cannot
+    share processed K-lines.
     """
 
     type: FractalType
@@ -140,10 +143,11 @@ class Fractal:
 @dataclass
 class Bi:
     """
-    Stroke/笔 per Lesson 62.
+    Stroke/笔 per Lessons 62, 65, 77.
 
     A Bi connects two adjacent fractals (top→bottom or bottom→top).
-    Must have at least one K-line between the top and bottom fractals.
+    A valid stroke needs at least one processed K-line that belongs to
+    neither endpoint fractal.
     """
 
     index: int

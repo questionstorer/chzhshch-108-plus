@@ -24,8 +24,8 @@ This system implements a comprehensive Chan Theory (缠论) framework based on t
 | Feature | Lessons | Module |
 |---------|---------|--------|
 | K-line inclusion processing (包含处理) | 62 | `kline_processor.py` |
-| Fractal detection + strength (分型识别) | 62, 82 | `fractal.py` |
-| Bi/Stroke construction (笔) | 62 | `bi.py` |
+| Fractal detection + strength (分型识别) | 62, 77, 82 | `fractal.py` |
+| Bi/Stroke construction (笔) | 62, 65, 77 | `bi.py` |
 | Segment construction - Case 1 & 2 (线段) | 62, 65, 67, 77, 78 | `segment.py` |
 | Hub detection, extension, expansion (中枢) | 17, 20, 24, 25, 33, 36, 70 | `hub.py` |
 | MACD divergence (背驰) | 15, 25 | `divergence.py` |
@@ -188,15 +188,16 @@ Raw K-lines
 └──────────┬──────────┘
            ▼
 ┌─────────────────────┐
-│ 2. Fractal Detection │  (分型识别, Lesson 62)
-│    Top/Bottom fractals│
-│    + strength analysis│
+│ 2. Fractal Detection │  (分型识别, Lessons 62/77)
+│    Local fractals +   │
+│    combination-law    │
+│    cleanup            │
 └──────────┬──────────┘
            ▼
 ┌─────────────────────┐
-│ 3. Bi Construction   │  (笔的构建, Lesson 62)
-│    Connect fractals  │
-│    with direction    │
+│ 3. Bi Construction   │  (笔的构建, Lessons 62/65/77)
+│    Strict endpoint   │
+│    pairing + gap     │
 └──────────┬──────────┘
            ▼
 ┌─────────────────────┐
@@ -246,8 +247,8 @@ analyzer.analyze()              # Run full pipeline
 
 # Results
 analyzer.klines      # Processed K-lines (after inclusion)
-analyzer.fractals    # Detected fractals
-analyzer.bis         # Bi strokes
+analyzer.fractals    # Normalized fractals after combination-law cleanup
+analyzer.bis         # Bi strokes using the strict 1-independent-K-line rule
 analyzer.segments    # Segments
 analyzer.hubs        # All hubs (bi-level + segment-level)
 analyzer.hubs_bi     # Bi-level hubs
@@ -263,6 +264,11 @@ analyzer.ma_kisses      # MA kiss events
 analyzer.gaps           # Price gaps
 analyzer.summary()      # Complete summary dict
 ```
+
+Notes on the corrected Lesson-62/65/77 behavior:
+
+- `analyzer.fractals` is not a raw “all local extrema” dump. It is the cleaned fractal sequence after removing adjacent candidates that would violate combination law by sharing K-lines.
+- `analyzer.bis` uses the stricter stroke rule from the later clarifications: opposite fractals are only connected when there is at least one processed K-line outside both endpoint fractals, which implies a middle-K gap of at least 4.
 
 ### `MultiLevelAnalyzer` — Multi-Level Analysis
 

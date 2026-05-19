@@ -255,7 +255,7 @@ def chart_bi():
 
     ax.text(0.5, -0.08,
             "Rule: Each Bi connects two adjacent alternating fractals (Top↔Bottom).\n"
-            "There must be at least 1 independent K-line between the fractals of a valid Bi.",
+            "There must be at least 1 processed K-line outside both fractals of a valid Bi.",
             transform=ax.transAxes, ha="center", fontsize=10, style="italic",
             bbox=dict(boxstyle="round", facecolor="#e3f2fd"))
 

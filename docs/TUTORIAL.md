@@ -209,7 +209,7 @@ After processing, the raw 500 K-lines might become ~400 processed K-lines. The m
 
 ## 5. Step 2: Fractals (分型)
 
-**Source**: Lessons 62, 82 | **Code**: [`chan_theory/fractal.py`](../chan_theory/fractal.py)
+**Source**: Lessons 62, 77, 82 | **Code**: [`chan_theory/fractal.py`](../chan_theory/fractal.py)
 
 After inclusion processing, we detect **fractals (分型)** — the local turning-point patterns that define where price reverses direction.
 
@@ -233,13 +233,23 @@ Three consecutive processed K-lines where:
 
 K2 dips DOWN below both neighbors.
 
-### Alternation rule
+### Combination law and fractal cleanup
 
-Fractals must **strictly alternate**: Top → Bottom → Top → Bottom → ...
+Lesson 77 adds an important restriction that is easy to miss if you only read the original 3-bar definition: **adjacent valid fractals cannot share K-lines**. In other words, once inclusion handling is finished, you cannot keep two neighboring fractals if some processed K-line belongs to both.
 
-When two consecutive same-type fractals appear (e.g., two tops), only the more extreme one is kept:
-- Two tops → keep the higher one
-- Two bottoms → keep the lower one
+The implementation therefore treats fractal detection as a two-step process:
+
+1. Detect every local 3-K-line top/bottom candidate.
+2. Normalize that candidate stream so adjacent valid fractals obey the lesson constraints.
+
+The cleanup rules are:
+
+- If two adjacent candidates would share a processed K-line, the earlier one is discarded.
+- If two consecutive tops appear, a later top replaces an earlier one only when it makes a higher top.
+- If two consecutive bottoms appear, a later bottom replaces an earlier one only when it makes a lower bottom.
+- Otherwise both candidates are kept, and the stroke-construction step decides which one becomes the actual stroke endpoint.
+
+This is different from the earlier relaxed implementation, which forced a simple top-bottom-top-bottom alternation inside the fractal detector itself.
 
 ### Fractal strength (Lesson 82)
 
@@ -266,7 +276,7 @@ def analyze_fractal_strength(fractal: Fractal) -> FractalStrength:
 
 ## 6. Step 3: Bi / Strokes (笔)
 
-**Source**: Lesson 62 | **Code**: [`chan_theory/bi.py`](../chan_theory/bi.py)
+**Source**: Lessons 62, 65, 77 | **Code**: [`chan_theory/bi.py`](../chan_theory/bi.py)
 
 A **Bi (笔)**, or "stroke", is the fundamental building block of Chan Theory. It's a straight line connecting two adjacent alternating fractals.
 
@@ -279,7 +289,21 @@ A **Bi (笔)**, or "stroke", is the fundamental building block of Chan Theory. I
 
 ### The minimum requirement
 
-A valid Bi requires **at least 1 independent K-line** between the two fractals. Since each fractal uses 3 K-lines (and adjacent fractals can share a K-line), this means the gap between the K2 points of two fractals must be ≥ 3 K-lines.
+A valid Bi requires **at least 1 processed K-line that belongs to neither endpoint fractal**. Because adjacent valid fractals already may not share K-lines, this means the gap between the two middle K-lines must be **at least 4 processed K-lines**, not 3.
+
+So there are two different constraints:
+
+- **Fractal validity**: adjacent valid fractals cannot share processed K-lines.
+- **Stroke validity**: on top of that, a stroke needs one extra processed K-line outside both fractals.
+
+That distinction matters. Two opposite fractals can both be valid fractals and still be too close to form a valid Bi.
+
+Lessons 65 and 77 also imply that stroke construction is not just “pair every adjacent alternating fractal”. When continuous tops or continuous bottoms appear, the implementation keeps a running anchor:
+
+- A later higher top replaces an earlier lower top.
+- A later lower bottom replaces an earlier higher bottom.
+- Otherwise the earlier same-type fractal stays as the anchor until an opposite fractal forms a valid Bi.
+- If an opposite fractal appears but the turn is too small to satisfy the minimum requirement, the earlier fractal is ignored.
 
 ### Why Bi matters
 
@@ -296,10 +320,11 @@ This zigzag sequence is then used to detect higher-level structures (segments, h
 ```python
 # From chan_theory/bi.py
 def construct_bis(fractals, klines):
-    # For each pair of adjacent fractals:
-    #   1. Determine direction (BOTTOM→TOP = UP, TOP→BOTTOM = DOWN)
-    #   2. Validate minimum gap (k2 distance >= 3)
-    #   3. Create Bi object with the K-lines in between
+    # Walk the normalized fractals with a running anchor:
+    #   1. Replace the anchor only when a same-type fractal is more extreme
+    #   2. Require opposite-type endpoints
+    #   3. Require strict minimum gap (k2 distance >= 4)
+    #   4. Emit a Bi only when the opposite fractal forms a valid stroke
 ```
 
 ### Key properties of a Bi

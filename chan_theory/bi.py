@@ -1,15 +1,17 @@
 """
 Bi/Stroke construction (笔的构建).
-Based on Lesson 62 of 缠中说禅.
+Based on Lessons 62, 65, 77 of 缠中说禅.
 
 A Bi connects two adjacent fractals:
-  - Ascending Bi: Bottom Fractal → Top Fractal
-  - Descending Bi: Top Fractal → Bottom Fractal
+    - Ascending Bi: Bottom Fractal → Top Fractal
+    - Descending Bi: Top Fractal → Bottom Fractal
 
-Rules:
-  - At least 1 independent K-line must exist between the two fractals
-    (the K-lines shared by the two fractals don't count)
-  - Only adjacent fractals form valid Bi
+Rules clarified by Lessons 65/77:
+    - The two endpoint fractals must be opposite types.
+    - There must be at least one processed K-line that belongs to neither
+        endpoint fractal.
+    - When consecutive same-type fractals occur, use the structurally effective
+        one as the stroke endpoint.
 """
 
 from __future__ import annotations
@@ -19,53 +21,43 @@ from .data_types import Bi, Direction, Fractal, FractalType, KLine
 
 def construct_bis(fractals: list[Fractal], klines: list[KLine]) -> list[Bi]:
     """
-    Construct all valid Bi (strokes) from the fractal sequence.
+    Construct all valid Bi (strokes) from the normalized fractal sequence.
 
-    Each Bi connects two adjacent alternating fractals with at least
-    one K-line gap between the fractal K-line groups.
+    Lessons 65 and 77 make the pairing rule stricter than simply connecting
+    every adjacent alternating fractal. The implementation keeps a running
+    anchor fractal and only emits a Bi when the opposite fractal forms a valid
+    stroke with strict minimum separation.
     """
     if len(fractals) < 2:
         return []
 
     bis: list[Bi] = []
+    anchor = fractals[0]
 
-    for i in range(len(fractals) - 1):
-        f_start = fractals[i]
-        f_end = fractals[i + 1]
+    for candidate in fractals[1:]:
+        if candidate.type == anchor.type:
+            if _is_more_extreme(candidate, anchor):
+                anchor = candidate
+            continue
 
-        # Determine direction
-        if f_start.type == FractalType.BOTTOM and f_end.type == FractalType.TOP:
-            direction = Direction.UP
-        elif f_start.type == FractalType.TOP and f_end.type == FractalType.BOTTOM:
-            direction = Direction.DOWN
-        else:
-            continue  # Should not happen after alternation enforcement
+        if not _can_form_bi(anchor, candidate):
+            anchor = candidate
+            continue
 
-        # Validate: need at least 1 independent K-line between fractals
-        # The fractals share the middle K-line (k2), so we need
-        # f_end.k1.index > f_start.k3.index OR at minimum
-        # f_end.k2.index - f_start.k2.index >= 4 (strict) or >= 3 (relaxed)
-        # We use the relaxed standard: at least 1 K-line between k2 of both
-        gap = f_end.k2.index - f_start.k2.index
-        if gap < 3:
-            continue  # Not enough K-lines for a valid Bi
-
-        # Collect the K-lines that belong to this Bi
-        start_idx = f_start.k2.index
-        end_idx = f_end.k2.index
+        direction = _bi_direction(anchor, candidate)
+        start_idx = anchor.k2.index
+        end_idx = candidate.k2.index
         bi_klines = [k for k in klines if start_idx <= k.index <= end_idx]
 
         bi = Bi(
             index=len(bis),
             direction=direction,
-            start=f_start,
-            end=f_end,
+            start=anchor,
+            end=candidate,
             klines=bi_klines,
         )
         bis.append(bi)
-
-    # Validate Bi sequence - ensure proper structure
-    bis = _validate_bi_sequence(bis)
+        anchor = candidate
 
     # Re-index
     for i, b in enumerate(bis):
@@ -74,25 +66,30 @@ def construct_bis(fractals: list[Fractal], klines: list[KLine]) -> list[Bi]:
     return bis
 
 
-def _validate_bi_sequence(bis: list[Bi]) -> list[Bi]:
-    """
-    Validate and clean Bi sequence:
-    - Adjacent Bi must alternate direction (UP, DOWN, UP, DOWN...)
-    - When conflicts arise, keep the more significant stroke
-    """
-    if len(bis) < 2:
-        return bis
+def _bi_direction(start: Fractal, end: Fractal) -> Direction:
+    if start.type == FractalType.BOTTOM and end.type == FractalType.TOP:
+        return Direction.UP
+    return Direction.DOWN
 
-    result: list[Bi] = [bis[0]]
 
-    for bi in bis[1:]:
-        prev = result[-1]
+def _can_form_bi(start: Fractal, end: Fractal) -> bool:
+    if start.type == end.type:
+        return False
 
-        if bi.direction == prev.direction:
-            # Same direction: keep the one with larger range
-            if bi.change > prev.change:
-                result[-1] = bi
-        else:
-            result.append(bi)
+    if end.k2.index - start.k2.index < 4:
+        return False
 
-    return result
+    if start.type == FractalType.TOP:
+        return start.value > end.value
+
+    return end.value > start.value
+
+
+def _is_more_extreme(current: Fractal, previous: Fractal) -> bool:
+    if current.type != previous.type:
+        return False
+
+    if current.type == FractalType.TOP:
+        return current.value > previous.value
+
+    return current.value < previous.value
