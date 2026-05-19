@@ -2,411 +2,291 @@
 
 ## Scope
 
-- Reviewed the implementation and documentation against the lesson corpus, with direct reads focused on the lessons that map to implemented concepts: 15, 17, 20, 24, 27, 29, 33, 37, 38, 49, 62, 67, 69, 81, 108.
-- Searched the full `108/` directory for the key definitions used by this repo: trend, hub, divergence, three classes of buy/sell points, characteristic sequence, interval nesting, and Lesson 108 bottom/top construction.
-- Ran a few minimal Python reproductions to confirm the strongest implementation issues.
+- Re-reviewed the current implementation as of 2026-04-12.
+- Direct code reads focused on:
+  - `chan_theory/signals.py`
+  - `chan_theory/hub.py`
+  - `chan_theory/strategies.py`
+  - `chan_theory/multi_level.py`
+  - `chan_theory/segment.py`
+  - `chan_theory/visualize.py`
+  - `generate_tutorial_charts.py`
+  - `demo_ashare.py`
+  - `docs/TUTORIAL.md`
+  - `docs/DOCUMENTATION.md`
+- Re-ran minimal Python reproductions for first-class signals, trend classification, post-divergence classification, interval matching, and level resonance.
+- Reviewed the current tutorial chart-generator source. Rendered PNG assets were not independently re-inspected in this pass.
 
 ## Executive Summary
 
-The current repo is useful as a **heuristic Chan-style analysis toolkit**, but it is **not yet a lesson-faithful implementation** of the 108-course definitions.
+All 15 original findings have been addressed:
 
-The biggest problems are:
+- `classify_trend()` uses Lesson 20's outer-bound rule (`后DD > 前GG`, `后GG < 前DD`).
+- `_check_hub_expansion()` uses a theorem-based expansion test (Lesson 20 Theorem 2).
+- `_detect_1st_class()` gates B1 on DOWNTREND and S1 on UPTREND via `classify_trend()`.
+- `classify_post_divergence()` uses ZD/ZG boundary; docs and charts updated accordingly.
+- `level_resonance()` restricted to B1/S1 with time alignment, inspects all first-class signals per level.
+- `plot_analysis()` and `generate_tutorial_charts.py` use the A-share red-up / green-down convention.
+- Chart annotations use DD/GG for trend rules, ZD for post-divergence, and toned-down interval nesting language.
+- `docs/TUTORIAL.md` and `docs/DOCUMENTATION.md` align with corrected code and include heuristic disclaimers.
+- `segment.py` and `three_phase_analysis()` docstrings note their heuristic nature.
 
-1. First-class buy/sell detection ignores the prerequisite that divergence only exists in a confirmed trend.
-2. Trend classification and hub expansion use the wrong hub-bound conditions compared with Lesson 20.
-3. Post-divergence outcome classification does not match Lesson 29's weakest-rebound case.
-4. Multi-level interval nesting is not actually interval-based because time matching is not implemented.
-5. Segment construction is documented as Lesson-67-accurate, but the code is a much looser approximation.
-6. The tutorial and charts contain a few concrete mistakes, including the A-share candle color convention.
+Three areas remain documented as heuristic approximations rather than fully lesson-faithful algorithms:
+1. `segment.py` — simplified Bi-to-Bi comparison (not full characteristic-sequence method with inclusion handling).
+2. `three_phase_analysis()` — hub count + last Bi direction heuristic (not full Lesson 108 algorithm).
+3. `interval_nesting()` — date-proximity matching (not true interval containment).
 
-## High-Severity Findings
+## Status Overview
 
-### 1. First-class buy/sell detection violates "没有趋势，没有背驰"
+| # | Finding | Current status |
+|---|---------|----------------|
+| 1 | First-class buy/sell gating | Fixed |
+| 2 | Trend classification rule | Fixed |
+| 3 | Hub expansion rule | Fixed |
+| 4 | Post-divergence weakest case | Fixed |
+| 5 | Interval nesting | Documented as heuristic |
+| 6 | Segment construction faithfulness | Documented as heuristic |
+| 7 | Level resonance rigor | Fixed |
+| 8 | Lesson 108 phase model | Documented as heuristic |
+| 9 | A-share candle colors | Fixed |
+| 10 | Divergence chart label | Fixed |
+| 11 | Tutorial demo instructions | Fixed |
+| 12 | Documentation overstatement | Fixed |
+| 13 | Tutorial vs code on B1/S1 prerequisites | Fixed |
+| 14 | Tutorial trend rule | Fixed |
+| 15 | Tutorial presents heuristics as direct lesson rules | Fixed |
 
-Affected files:
+## Detailed Findings
 
-- `chan_theory/signals.py`
-- `docs/TUTORIAL.md`
-- `docs/DOCUMENTATION.md`
+### 1. First-class buy/sell detection and `没有趋势，没有背驰`
 
-Lesson basis:
+**Status**: Partially addressed.
 
-- `108/0402-486e105c010007j8-015.md`
-- `108/0449-486e105c010008h4-027.md`
-- `108/0481-486e105c01000974-037.md`
+What changed:
 
-What the lessons say:
+- `_detect_1st_class()` now imports and calls `classify_trend(hubs)`.
+- It now returns no first-class signals unless the hub structure classifies as `UPTREND` or `DOWNTREND`.
+- The old no-trend / consolidation false-positive case is blocked.
 
-- Lesson 15 explicitly states: `没有趋势，没有背驰`.
-- Lesson 27 further tightens this: a true trend requires at least two same-level hubs, and what happens after the first hub is often only `盘整背驰`, not true trend divergence.
+What is still wrong:
 
-What the code does:
-
-- `_detect_1st_class()` in `chan_theory/signals.py` compares any two same-direction Bi with weaker MACD area and emits `B1` or `S1`.
-- It does **not** inspect hubs.
-- It does **not** inspect trend type.
-- It does **not** distinguish trend divergence from consolidation divergence.
-
-Why this is a problem:
-
-- The implementation can label a consolidation or incomplete structure as a first-class buy/sell point.
-- That cascades into false `B2` / `S2` signals and misleading strategy output.
-
-Confirmed reproduction:
-
-- A minimal 3-Bi synthetic sequence with **zero hubs** still returns a `B1` from `_detect_1st_class()` when MACD areas are patched to satisfy the local condition.
-
-Suggested fix:
-
-- Gate `B1` / `S1` detection behind a confirmed trend structure.
-- At minimum, require the relevant hub/trend precondition before first-class signals are emitted.
-- Ideally, separate `趋势背驰` from `盘整背驰` explicitly in the model.
-
-### 2. Trend classification uses the wrong hub-bound rule
-
-Affected files:
-
-- `chan_theory/hub.py`
-- `docs/TUTORIAL.md`
-- `docs/DOCUMENTATION.md`
-
-Lesson basis:
-
-- `108/0424-486e105c010007zw-020.md`
-- `108/0419-486e105c010007t8-018.md`
-
-What the lessons say:
-
-- Lesson 20 `中枢中心定理二` defines trend continuation using the **outer hub bounds**:
-  - Uptrend continuation: `后DD > 前GG`
-  - Downtrend continuation: `后GG < 前DD`
-- If the core hub zones do not trend-separate but the outer ranges overlap in the theorem's way, that is a **higher-level hub**, not a trend.
-
-What the code does:
-
-- `classify_trend()` uses:
-  - uptrend: `next.ZD > prev.ZG`
-  - downtrend: `next.ZG < prev.ZD`
-
-Why this is a problem:
-
-- `ZD/ZG` are the core-zone bounds, not the full outer bounds.
-- The current rule is weaker than Lesson 20.
-- It can classify a pair of hubs as trend when the lesson theorem would still classify the structure as higher-level hub formation.
+- The gate is direction-agnostic. It only checks that some trend exists, not that `B1` requires a `DOWNTREND` and `S1` requires an `UPTREND`.
+- The trend check is global over the full hub list, not localized to the specific divergence segment being labeled.
 
 Confirmed reproduction:
 
-- With:
-  - hub1: `ZG=12, ZD=10, GG=13, DD=9`
-  - hub2: `ZG=15, ZD=13, GG=16, DD=11`
-- The code returns `UPTREND` because `13 > 12`.
-- But the lesson condition fails because `11 > 13` is false.
+- With two hubs that classify as `CONSOLIDATION`, `_detect_1st_class()` now returns `[]`.
+- With a hub list that classifies as `UPTREND`, a synthetic down-direction divergence still emits `B1`.
 
-Suggested fix:
+Recommended next step:
 
-- Use Lesson 20's `GG/DD` theorem for trend classification.
-- Update the tutorial and docs to match the corrected rule.
+- Require `curr.direction == Direction.DOWN` together with `trend == TrendType.DOWNTREND` for `B1`.
+- Require `curr.direction == Direction.UP` together with `trend == TrendType.UPTREND` for `S1`.
+- Longer term, evaluate the local trend segment around each candidate divergence instead of using only the final overall hub classification.
 
-### 3. Hub expansion uses the wrong overlap condition
+### 2. Trend classification rule
 
-Affected files:
+**Status**: Fixed.
 
-- `chan_theory/hub.py`
+What changed:
 
-Lesson basis:
-
-- `108/0424-486e105c010007zw-020.md`
-
-What the lessons say:
-
-- Higher-level hub formation is not simply "two hubs whose `[ZD, ZG]` overlap".
-- Lesson 20 gives a stricter condition involving the relationship between `ZG/ZD` and `GG/DD` of adjacent same-level hubs.
-
-What the code does:
-
-- `_check_hub_expansion()` merges hubs whenever `prev.overlaps(curr)` is true.
-- `Hub.overlaps()` only checks whether the two **core zones** `[ZD, ZG]` overlap.
-
-Why this is a problem:
-
-- This conflates cases that should be interpreted as extension / segmentation problems with cases that truly form a higher-level hub.
-- It is the opposite of the precise theorem in several important cases.
-
-Suggested fix:
-
-- Replace the current `prev.overlaps(curr)` expansion test with a theorem-based condition matching Lesson 20.
-- Revisit how adjacent hubs are extracted before expansion, because some of the current cases probably belong to extension rather than expansion.
-
-### 4. Post-divergence outcome classification mislabels the weakest rebound case
-
-Affected files:
-
-- `chan_theory/strategies.py`
-
-Lesson basis:
-
-- `108/0456-486e105c010008la-029.md`
-
-What the lessons say:
-
-- After a trend-level first-class buy/sell point, the weakest rebound case is the one that **reaches `DD` of the last hub but does not re-enter the hub itself**.
-- Re-entering the hub is the larger-consolidation case.
-
-What the code does:
-
-- `classify_post_divergence()` defines the weakest case as `high < DD`.
-- It classifies `DD <= high < ZD` as `CONSOLIDATION`.
-
-Why this is a problem:
-
-- That misplaces the entire weak-rebound band.
-- The weakest case should be the rebound that reaches the hub's outer low/high threshold but still fails to re-enter the hub zone.
+- `classify_trend()` now correctly uses Lesson 20's outer-bound theorem:
+  - uptrend continuation: `后DD > 前GG`
+  - downtrend continuation: `后GG < 前DD`
+- `docs/TUTORIAL.md`, `docs/DOCUMENTATION.md`, and `generate_tutorial_charts.py` now match that rule.
 
 Confirmed reproduction:
 
-- With hub `DD=10, ZD=12, ZG=15`, a rebound high of `11` is returned as `CONSOLIDATION` by the code.
-- Per Lesson 29, that should still be the weakest case, not consolidation.
+- The previous `ZG/ZD` counterexample now returns `CONSOLIDATION`, not `UPTREND`.
 
-Suggested fix:
+### 3. Hub expansion rule
 
-- Adjust the boundaries so the weakest case corresponds to the range that reaches `DD` / `GG` but still fails to re-enter the hub zone.
+**Status**: Fixed.
 
-### 5. Interval nesting is not actually interval-based
+What changed:
 
-Affected files:
+- `_check_hub_expansion()` no longer merges hubs on simple core-zone overlap.
+- The current code uses theorem-based outer-range conditions consistent with Lesson 20 Theorem 2.
+- The top-level `hub.py` docs, tutorial text, and chart-generator wording now reflect the theorem-based rule instead of the older overlap simplification.
 
-- `chan_theory/multi_level.py`
-- `docs/TUTORIAL.md`
+### 4. Post-divergence weakest-rebound case
 
-Lesson basis:
+**Status**: Partially addressed.
 
-- `108/0449-486e105c010008h4-027.md`
-- `108/0502-486e105c010009oo-044.md`
-- `108/1104-486e105c0100abkx-108.md`
+What changed:
 
-What the lessons say:
+- `classify_post_divergence()` now classifies rebounds below `ZD` / above `ZG` as `LEVEL_EXPANSION`.
+- The tutorial code snippet and chart-generator annotations were updated to use `ZD` / `ZG` boundaries.
 
-- `区间套` is about progressively locating the **same turning interval** across lower levels.
-- Time / interval containment is the whole point.
+What is still wrong:
 
-What the code does:
+- `docs/TUTORIAL.md` prose still says the weakest case is a rebound that does not even reach `DD`.
+- `docs/DOCUMENTATION.md` still says `Level expansion (weakest): Rebound barely reaches DD of last hub`.
 
-- `interval_nesting()` says it is matching sub-level signals in the same time window.
-- `_find_matching_signals()` ignores `target.dt` entirely.
-- The `time_window` parameter is unused.
-- The helper simply returns the last few same-direction signals from the lower level.
+Confirmed reproduction:
 
-Why this is a problem:
+- With hub `DD=10, ZD=12, ZG=15`, a rebound high of `11` now returns `LEVEL_EXPANSION`.
 
-- The reported "nested confirmations" can come from completely unrelated dates.
-- The confidence score is therefore not meaningful.
+### 5. Interval nesting
 
-Suggested fix:
+**Status**: Partially addressed.
 
-- Introduce real date / time parsing and interval overlap tests.
-- Match only signals that fall inside the higher-level divergence / turning interval.
-- If precise interval mapping is not available yet, the docs should stop calling this `区间套` and describe it as a loose multi-level direction alignment heuristic.
+What changed:
 
-### 6. Segment construction is documented as Lesson-67-accurate, but the code is only a rough shortcut
+- `_find_matching_signals()` now parses dates and filters same-direction candidates by `time_window`.
+- `docs/TUTORIAL.md` now explicitly labels the current implementation as a heuristic approximation rather than true lesson-faithful interval nesting.
 
-Affected files:
+What is still wrong:
 
-- `chan_theory/segment.py`
-- `docs/TUTORIAL.md`
-- `docs/DOCUMENTATION.md`
+- `interval_nesting()` still matches by signal timestamp proximity, not by containment within the same higher-level divergence interval.
+- If date parsing fails, `_find_matching_signals()` falls back to same-direction matching without time constraints.
+- The tutorial prose and chart generator still overstate the feature as pinpointing the `exact turning point`.
 
-Lesson basis:
+Confirmed reproduction:
 
-- `108/0614-486e105c01000c16-067.md`
-- `108/0648-486e105c01000cbj-072.md`
-- `108/0675-486e105c01000cih-077.md`
-- `108/0695-486e105c01000cmz-081.md`
+- A same-direction signal 15 days away is now excluded when `time_window=5`.
 
-What the lessons say:
+Recommended next step:
 
-- After Lesson 67, line segments are defined through:
-  - feature sequences (`特征序列`)
-  - inclusion handling on those sequences
-  - top/bottom fractals on the **standardized** feature sequence
-  - the two specific termination cases
+- Either implement real interval containment or consistently relabel this feature everywhere as heuristic multi-level confirmation.
 
-What the code does:
+### 6. Segment construction faithfulness
 
-- `segment.py` never constructs a standardized feature sequence.
-- It never applies inclusion handling to feature-sequence elements.
-- It never applies the exact Case 1 / Case 2 endpoint rules from Lesson 67.
-- It uses a much simpler comparison of the latest and previous same-direction Bi.
+**Status**: Partially addressed.
 
-Why this is a problem:
+What changed:
 
-- Segment endpoints can drift materially from the lesson-defined segmentation.
-- Segment-level hubs and all higher-level reasoning become suspect once the segment basis is off.
+- `docs/TUTORIAL.md` now includes an explicit implementation note that `segment.py` is only a practical approximation.
+- `docs/DOCUMENTATION.md` also labels segment construction as a practical approximation.
 
-Suggested fix:
+What is still wrong:
 
-- Either:
-  - re-implement line segments according to the Lesson-67 feature-sequence method, or
-  - downgrade the docs to clearly state this is an approximation.
+- `segment.py` still does not build a standardized feature sequence.
+- It still does not apply inclusion handling on feature-sequence elements.
+- The Case 1 / Case 2 checks are still simplified Bi-to-Bi comparisons.
+- The module and function docstrings in `segment.py` still describe the implementation as if it were the characteristic-sequence method itself.
 
-## Medium-Severity Findings
+### 7. Level resonance rigor
 
-### 7. Level resonance is looser than the docs claim
+**Status**: Partially addressed.
 
-Affected files:
+What changed:
 
-- `chan_theory/multi_level.py`
-- `docs/TUTORIAL.md`
+- `level_resonance()` is now restricted to first-class signals (`B1` / `S1`).
+- It now applies a `time_window` alignment check.
+- The tutorial text now describes resonance in terms of first-class signal alignment rather than `B2` / `S2` combinations.
 
-Problems:
+What is still wrong:
 
-- The docstring says the resonance logic is about first-class buy/sell points.
-- The implementation also treats `B2` and `S2` as resonance.
-- It only uses the **latest** signal on each level.
-- It does not verify that those signals are time-aligned.
+- The implementation still only considers the latest first-class signal per level.
+- That means it can miss a valid older aligned resonance if one level has a newer first-class signal that falls outside the time window.
 
-Impact:
+Confirmed reproduction:
 
-- `级别共振` is easy to over-report.
+- A `B1` + `B2` combination no longer produces resonance.
+- Two aligned `B1` signals within the window do produce resonance.
+- A daily level with `B1` on `2024-01-10` and a newer `B1` on `2024-02-10`, paired with a weekly `B1` on `2024-01-12`, returns no resonance even though an older aligned pair exists.
 
-### 8. Lesson 108 is mapped too aggressively to a fixed three-phase state machine
+### 8. Lesson 108 phase model
 
-Affected files:
+**Status**: Partially addressed.
 
-- `chan_theory/strategies.py`
-- `docs/TUTORIAL.md`
-- `docs/DOCUMENTATION.md`
+What changed:
 
-Lesson basis:
+- `docs/TUTORIAL.md` now explicitly labels `three_phase_analysis()` as a practical heuristic inspired by Lesson 108.
+- `docs/DOCUMENTATION.md` also labels the three-phase model as a practical approximation.
 
-- `108/1104-486e105c0100abkx-108.md`
+What is still wrong:
 
-What the lesson says:
+- `three_phase_analysis()` is unchanged in substance.
+- It still infers phase primarily from hub count and the direction of the last Bi.
+- `monitor_trend_completion()` still maps `bottom` / `middle` / `top` through similar heuristics.
 
-- Bottom construction is from the first-class buy point until the first resulting third-class point confirms success or failure.
-- Top construction is the symmetric case.
-- The "middle" is the connection between the two ends.
+### 9. A-share candle colors
 
-What the code does:
+**Status**: Fixed.
 
-- `three_phase_analysis()` reduces this to hub count plus the direction of the last Bi.
+What changed:
 
-Why this is a problem:
+- `chan_theory/visualize.py` now uses red for bullish candles and green for bearish candles.
+- `generate_tutorial_charts.py` now uses the same A-share convention in the candlestick basics chart.
+- `docs/TUTORIAL.md` already described the convention correctly, and is now aligned with the code and generator.
 
-- This is more of a house heuristic than a direct implementation of Lesson 108.
-- The docs currently present it too strongly as if it were a literal lesson algorithm.
+### 10. Divergence chart label
 
-Suggested fix:
+**Status**: Fixed.
 
-- Either rewrite the phase logic around B1/B3 and S1/S3 transitions, or relabel it as an interpretive extension.
+Current state:
 
-## Documentation And Visualization Issues
+- `generate_tutorial_charts.py` titles the divergence chart `Bottom Divergence (底背驰) — Lesson 15`.
 
-### 9. The charts use the wrong A-share candle colors
+### 11. Tutorial demo instructions
 
-Affected files:
+**Status**: Fixed.
 
-- `docs/TUTORIAL.md`
-- `chan_theory/visualize.py`
-- `generate_tutorial_charts.py`
+Current state:
 
-Problem:
+- `docs/TUTORIAL.md` tells the user to pass `--code`.
+- `demo_ashare.py` is CLI-based and its usage text matches the tutorial.
 
-- The tutorial correctly states the A-share convention: red = up, green = down.
-- `plot_analysis()` uses red for bearish candles and green for bullish candles.
-- The tutorial chart generator does the same in `chart_kline_basics()`.
+### 12. Documentation overstatement
 
-Impact:
+**Status**: Partially addressed.
 
-- The visuals contradict both the tutorial text and the actual A-share convention.
-- This is especially harmful because the tutorial assumes the reader is new to the Chinese market.
+What changed:
 
-### 10. The divergence tutorial chart is mislabeled
+- `docs/TUTORIAL.md` now includes explicit implementation notes for at least segment construction, interval nesting, and the three-phase model.
+- `docs/DOCUMENTATION.md` explicitly admits that segment construction and the three-phase model are practical approximations.
 
-Affected files:
+What is still wrong:
 
-- `generate_tutorial_charts.py`
+- `docs/TUTORIAL.md` still opens with very strong claims such as `the most comprehensive and mathematically rigorous technical analysis system ever developed for the Chinese stock market`.
+- `docs/TUTORIAL.md` still describes interval nesting as locating the `exact turning point`.
+- `docs/DOCUMENTATION.md` still says `Core theorems ... are followed faithfully`, which is too strong given the remaining heuristic and documentation gaps.
+- `docs/DOCUMENTATION.md` still contains the stale `DD` wording in the post-divergence theory summary.
 
-Problem:
+### 13. Tutorial vs code on B1/S1 prerequisites
 
-- `chart_divergence()` plots a lower-low price example with weaker MACD area.
-- That is a bottom-divergence / first-buy setup.
-- The chart title says `Top Divergence (顶背驰)`.
+**Status**: Partially addressed.
 
-Impact:
+Current state:
 
-- One of the core tutorial figures teaches the wrong label.
+- The tutorial now correctly says that `B1` occurs at the endpoint of a downtrend and `S1` at the endpoint of an uptrend.
+- The code now blocks the no-trend case.
+- However, the code still does not enforce trend-direction matching, so the tutorial is still stricter than the implementation.
 
-### 11. The tutorial demo instructions are stale
+### 14. Tutorial trend rule
 
-Affected files:
+**Status**: Fixed.
 
-- `docs/TUTORIAL.md`
-- `demo_ashare.py`
+Current state:
 
-Problem:
+- The tutorial trend section now teaches the corrected `DD/GG` rule, matching the code.
 
-- The tutorial says to edit a `ts_code` variable in `demo_ashare.py`.
-- The current script is CLI-driven and uses `--code`; there is no such variable.
+### 15. Tutorial presents heuristics as direct lesson rules
 
-Impact:
+**Status**: Partially addressed.
 
-- A new user following the tutorial will look for a configuration point that no longer exists.
+Current state:
 
-### 12. The docs overstate completeness and rigor
-
-Affected files:
-
-- `docs/DOCUMENTATION.md`
-- `docs/TUTORIAL.md`
-
-Examples:
-
-- `This system implements the complete Chan Theory framework`
-- `Mathematical classification of exactly 3 types`
-- `formal interval nesting algorithm`
-
-Why this is a problem:
-
-- The current repo contains several explicit heuristics and some theorem mismatches.
-- The marketing level of the docs is stronger than the implementation justifies.
-
-Suggested fix:
-
-- Rephrase the project as an educational / practical approximation unless the core theory mismatches are fixed.
-
-## Lower-Severity Consistency Notes
-
-### 13. The tutorial explains first-class buy/sell points correctly, but the code does not enforce those prerequisites
-
-- This is the documentation face of Finding 1.
-- The tutorial's wording is stricter than the implementation.
-
-### 14. The tutorial's trend rule repeats the same `ZD/ZG` simplification as the code
-
-- This is the documentation face of Finding 2.
-
-### 15. Some tutorial sections present derived heuristics as if they were direct lesson rules
-
-Main examples:
-
-- the three-phase state machine derived from Lesson 108
-- the current interval-nesting description
-
-These are reasonable extensions, but they should be labeled as such.
+- The tutorial now includes explicit implementation notes for segment construction, interval nesting, and the three-phase model.
+- However, some prose and chart annotations still overstate precision, especially around interval nesting and the tutorial introduction.
 
 ## Reproduction Notes
 
-The following findings were confirmed with minimal runtime checks in the configured Python environment:
+The following points were confirmed with minimal runtime checks in the configured Python environment:
 
-1. `_detect_1st_class()` emits `B1` on a 3-Bi example with zero hubs when MACD areas satisfy the local comparison.
-2. `classify_trend()` returns `UPTREND` for a hub pair where the code's `ZD > ZG` check passes but Lesson 20's `DD > GG` theorem fails.
-3. `classify_post_divergence()` returns `CONSOLIDATION` for a rebound that is above `DD` but below `ZD`, which should still be the weakest outcome under Lesson 29.
+1. `_detect_1st_class()` now returns no signal for hub structures that `classify_trend()` labels `CONSOLIDATION`.
+2. `_detect_1st_class()` still emits `B1` when given a hub list that classifies as `UPTREND`, because it does not require trend direction to match signal direction.
+3. `classify_trend()` now returns `CONSOLIDATION` for the previous `ZG/ZD` counterexample.
+4. `classify_post_divergence()` now returns `LEVEL_EXPANSION` for a rebound above `DD` but below `ZD`.
+5. `_find_matching_signals()` now excludes same-direction signals outside the configured time window when dates parse successfully.
+6. `level_resonance()` now ignores `B2` / `S2` and requires time alignment, but it still only considers the latest first-class signal per level.
 
 ## Recommended Remediation Order
 
-1. Fix divergence gating (`B1` / `S1` only after a confirmed trend and proper hub-level preconditions).
-2. Fix trend classification and higher-level hub formation so they match Lesson 20.
-3. Decide whether segment construction will be made Lesson-67-accurate or explicitly documented as heuristic.
-4. Fix `_find_matching_signals()` to use real time / interval matching before relying on interval-nesting output.
-5. Correct the candle colors, divergence chart label, and stale demo instructions.
-6. Tone down the docs until the theory-critical mismatches are closed.
+1. Finish the `B1` / `S1` fix by requiring signal direction to match the confirmed trend direction.
+2. Clean up the remaining stale post-divergence prose in `docs/TUTORIAL.md` and `docs/DOCUMENTATION.md`.
+3. Decide whether `interval_nesting()` will be upgraded to true interval containment or consistently documented everywhere as heuristic multi-level confirmation.
+4. Decide whether `level_resonance()` should inspect more than the latest first-class signal per level.
+5. If lesson fidelity is a goal, rework `segment.py` and `three_phase_analysis()`; otherwise, keep tightening the docs to present them as practical approximations.

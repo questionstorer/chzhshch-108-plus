@@ -5,7 +5,7 @@ Based on Lessons 62, 65, 67, 71, 77, 78 of 缠中说禅.
 A segment is composed of at least 3 consecutive Bi (strokes).
 A segment is terminated when a sub-level structure breaks its direction:
   - An UP segment ends when a descending Bi's low breaks below the
-    previous ascending Bi's low (characteristic sequence method)
+    previous ascending Bi's low
   - A DOWN segment ends when an ascending Bi's high breaks above the
     previous descending Bi's high
 
@@ -15,6 +15,12 @@ Termination Cases (Lessons 65, 67, 71, 77):
   Case 1 (第一种情况): Characteristic sequence gap filled → segment broken.
   Case 2 (第二种情况): Gap not filled but the next same-direction
     characteristic element itself breaks → original segment also broken.
+
+Implementation note:
+  The current implementation uses simplified Bi-to-Bi comparisons as a
+  practical approximation.  A fully lesson-faithful implementation would
+  build a standardized feature sequence with inclusion handling on the
+  feature-sequence elements themselves (Lesson 67).
 """
 
 from __future__ import annotations
@@ -26,11 +32,15 @@ def construct_segments(bis: list[Bi]) -> list[Segment]:
     """
     Construct segments from a sequence of Bi (strokes).
 
-    Uses the characteristic sequence method (特征序列) from Lesson 67:
+    Uses a simplified approximation of the characteristic sequence method
+    (特征序列) from Lesson 67:
     - For an UP segment, examine descending Bi as the characteristic sequence
     - For a DOWN segment, examine ascending Bi as the characteristic sequence
     - A segment ends when the characteristic sequence forms a fractal
       in the opposite direction
+
+    Note: this does not build a fully standardized feature sequence with
+    inclusion handling on the feature-sequence elements.
     """
     if len(bis) < 3:
         return []

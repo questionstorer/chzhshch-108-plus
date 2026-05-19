@@ -16,9 +16,10 @@ Hub extension (Lesson 25):
   A hub extends when the next element's range overlaps with [ZD, ZG].
   When extension reaches 6+ elements → level upgrade.
 
-Hub expansion (Lesson 36):
-  Two adjacent same-level hubs with overlapping ranges merge into a
-  higher-level hub.
+Hub expansion (Lesson 20 Theorem 2, Lesson 36):
+  Two adjacent same-level hubs whose core zones [ZD, ZG] are separated
+  (i.e. not trend-continuing per DD/GG) but whose outer ranges [DD, GG]
+  overlap, merge into a higher-level hub.
 
 Hub generation (Lesson 70):
   After a third-type buy/sell point, a new hub must eventually form.

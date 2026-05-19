@@ -73,11 +73,11 @@ def chart_kline_basics():
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # Draw two example candles – bullish and bearish
-    # Bullish (rising): close > open, colored green
+    # Bullish (rising): close > open, colored red (A-share convention)
     x = 1
     o, c, h, l = 10, 13, 14, 9.5
-    ax.plot([x, x], [l, h], color="#388e3c", lw=2)
-    ax.bar(x, c - o, bottom=o, width=0.5, color="#388e3c", edgecolor="#388e3c")
+    ax.plot([x, x], [l, h], color="#d32f2f", lw=2)
+    ax.bar(x, c - o, bottom=o, width=0.5, color="#d32f2f", edgecolor="#d32f2f")
     # Labels
     ax.annotate("High (最高价)", xy=(x, h), xytext=(x + 0.8, h + 0.3),
                 fontsize=10, arrowprops=dict(arrowstyle="->", color="gray"))
@@ -88,19 +88,19 @@ def chart_kline_basics():
     ax.annotate("Low (最低价)", xy=(x, l), xytext=(x + 0.8, l - 0.7),
                 fontsize=10, arrowprops=dict(arrowstyle="->", color="gray"))
     ax.text(x, h + 1.2, "Bullish (Yang/阳线)\nClose > Open", ha="center",
-            fontsize=10, color="#388e3c", fontweight="bold")
+            fontsize=10, color="#d32f2f", fontweight="bold")
 
-    # Bearish (falling): close < open, colored red
+    # Bearish (falling): close < open, colored green (A-share convention)
     x = 4
     o, c, h, l = 13, 10, 14, 9.5
-    ax.plot([x, x], [l, h], color="#d32f2f", lw=2)
-    ax.bar(x, o - c, bottom=c, width=0.5, color="#d32f2f", edgecolor="#d32f2f")
+    ax.plot([x, x], [l, h], color="#388e3c", lw=2)
+    ax.bar(x, o - c, bottom=c, width=0.5, color="#388e3c", edgecolor="#388e3c")
     ax.annotate("Open (开盘价)", xy=(x - 0.25, o), xytext=(x - 1.8, o + 0.5),
                 fontsize=10, arrowprops=dict(arrowstyle="->", color="gray"))
     ax.annotate("Close (收盘价)", xy=(x - 0.25, c), xytext=(x - 1.8, c - 0.8),
                 fontsize=10, arrowprops=dict(arrowstyle="->", color="gray"))
     ax.text(x, h + 1.2, "Bearish (Yin/阴线)\nOpen > Close", ha="center",
-            fontsize=10, color="#d32f2f", fontweight="bold")
+            fontsize=10, color="#388e3c", fontweight="bold")
 
     # Upper/lower shadow labels
     ax.annotate("Upper shadow\n(上影线)", xy=(1, 13.5), xytext=(-0.5, 14.5),
@@ -406,7 +406,7 @@ def chart_trend_vs_consolidation():
     # Zigzag through both
     pts = [(0, 10), (2, 13), (3.5, 11), (5.5, 15), (7, 14), (9, 18), (10.5, 15.5)]
     ax.plot([p[0] for p in pts], [p[1] for p in pts], "b-", lw=2)
-    ax.annotate("Hub2.ZD > Hub1.ZG\n= Non-overlapping\n=> UPTREND",
+    ax.annotate("Hub2.DD > Hub1.GG\n= Non-overlapping (Lesson 20)\n=> UPTREND",
                 xy=(5.5, 14), fontsize=11, color="#388e3c", fontweight="bold",
                 bbox=dict(boxstyle="round", facecolor="#e8f5e9"))
     ax.set_title("Uptrend (上涨趋势)\n2+ ascending, non-overlapping hubs", fontweight="bold", color="#388e3c")
@@ -595,7 +595,7 @@ def chart_multi_level():
     pts_m = [(0, 27), (3, 30), (5, 26), (7, 28), (9, 25), (11, 27), (13, 24.5)]
     ax.plot([p[0] for p in pts_m], [p[1] for p in pts_m], "b-", lw=1.5)
     ax.plot(13, 24.5, "g^", markersize=16, zorder=5)
-    ax.annotate("EXACT turning point!\n(B1 at smallest level)",
+    ax.annotate("Narrowed turning point\n(B1 at smallest level)",
                 xy=(13, 24.5), xytext=(9, 22), fontsize=10, color="#388e3c",
                 fontweight="bold",
                 arrowprops=dict(arrowstyle="->", color="#388e3c", lw=2),
@@ -606,7 +606,7 @@ def chart_multi_level():
         ax.set_ylabel("Price")
 
     fig.suptitle("Interval Nesting (区间套) & Multi-Level Analysis — Lessons 37, 52, 81\n"
-                 "Zoom from higher to lower timeframes to find the EXACT turning point",
+                 "Zoom from higher to lower timeframes to narrow down the turning point",
                  fontsize=13, fontweight="bold")
     plt.tight_layout()
     save(fig, "10_multi_level.png")
@@ -739,9 +739,9 @@ def chart_hub_advanced():
     # Merged
     rect3 = mpatches.Rectangle((0, 10), 7, 4, lw=3, ec="#e91e63", fc="#fce4ec", alpha=0.3)
     ax.add_patch(rect3)
-    ax.text(3.5, 15.5, "Overlapping hubs merge\n=> Higher-level hub!", ha="center",
+    ax.text(3.5, 15.5, "Non-trending adjacent hubs\n=> Higher-level hub!", ha="center",
             fontsize=10, color="#e91e63", fontweight="bold")
-    ax.set_title("Hub Expansion (中枢扩展)\nLesson 36: overlapping hubs\nmerge into higher level", fontweight="bold")
+    ax.set_title("Hub Expansion (中枢扩展)\nLesson 20/36: non-trending hubs\nmerge into higher level", fontweight="bold")
     ax.set_ylim(8, 17)
 
     # Migration
@@ -775,7 +775,7 @@ def chart_post_divergence():
     for idx, (ax, title, color, desc) in enumerate(zip(axes, [
         "Level Expansion\n(级别扩展)", "Consolidation\n(更大级别盘整)", "Reverse Trend\n(反向趋势)"
     ], ["#f44336", "#ff9800", "#388e3c"], [
-        "Weakest rebound:\nstays below DD\nof last hub",
+        "Weakest rebound:\nstays below ZD\nof last hub",
         "Medium rebound:\nre-enters last hub\n[ZD, ZG] zone",
         "Strongest reversal:\nbreaks through\nthe entire hub"
     ])):
@@ -791,7 +791,7 @@ def chart_post_divergence():
 
         if idx == 0:  # Level expansion - weak bounce
             ax.plot([7, 9], [11, 11.5], color=color, lw=2.5)
-            ax.annotate("Bounce barely\nreaches DD", xy=(9, 11.5), fontsize=9, color=color)
+            ax.annotate("Bounce stays\nbelow ZD", xy=(9, 11.5), fontsize=9, color=color)
         elif idx == 1:  # Consolidation
             ax.plot([7, 9], [11, 14], color=color, lw=2.5)
             ax.annotate("Re-enters hub\nzone", xy=(9, 14), fontsize=9, color=color)
